@@ -7,7 +7,12 @@ from google.auth.transport.requests import Request
 import json
 import base64
 import webbrowser
+import sys
 from flask import jsonify
+import re
+from urllib.parse import unquote
+import codecs
+
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -29,43 +34,29 @@ def get_inbox(service):
 
 def message_parser(messages, num_of_messages, service):
     try:
+        print('HERE123')
+        list_of_emails = []
         for i in range(num_of_messages):
             curr_message_info = service.users().messages() \
                 .get(userId='me',id=messages[i]['id']).execute()
             headers = curr_message_info['payload']['headers']
-            print('hERE!')
+            headers_dict = {}
+            index = 0
             for j in range(len(headers)):
-                if headers[j]['name'] == 'From' and '<no-reply@sns.amazonaws.com>' in headers[j]['value']:
-                    json_body = json.loads(decode_string(curr_message_info['payload']['body']['data']))
-                    print(json_body['notificationType'])
+                headers_dict[headers[j]['name']]= headers[j]['value']
 
-                    return json_body
-
-                #     file_name = ''
-                #     if headers[j]['name'] == 'Content-Type':
-                #         print(headers[j]['value'])
-                #         if 'multipart/alternative' in headers[j]['value']:
-                #             multipart_text = multipart_alt_parser(curr_message_info['payload']['parts'][0])
-                #             file_name = '../output/multipart_text_index_' + str(i) + '.txt'
-                #             return multipart_text
-                #             #write_file_utility(file_name, multipart_text)
-                #
-                #         elif 'text/html' in headers[j]['value']:
-                #             decoded_html = decode_string(curr_message_info['payload']['body']['data'])
-                #             file_name = '../output/html_index_' + str(i) + '.html'
-                #             return decoded_html
-                #             #write_file_utility(file_name, decoded_html)
-                #
-                #         elif 'text/plain' in headers[j]['value']:
-                #             return curr_message_info
-                #         else:
-                #             return 'Error: Please try again.'
-                #         continue
-                #
-                # print('-------------' + str(i) + '----------------')
+            if '<no-reply@sns.amazonaws.com>' in headers_dict['From']:
+                print('HERE456')
+                decoded_bytes = decode_string(curr_message_info['payload']['body']['data'])
+                print('HERE789')
+                utf8_str = str(decoded_bytes, 'UTF-8')
+                list_of_emails.append(utf8_str)
+                index += 1
+        return list_of_emails
     except:
-        print("Unexpected error:")#, sys.exc_info()[0])
-        #raise
+        e = sys.exc_info()
+        print(str(e))
+        return str(e)
 
 
 
@@ -77,8 +68,10 @@ def multipart_alt_parser(message):
 
 
 def decode_string(message):
-    decoded_message = base64.urlsafe_b64decode(message)
-    return str(decoded_message).replace('\\r','').replace('\\t','').replace('\\n','')
+    decoded_message = base64.urlsafe_b64decode(message + '==')
+    return decoded_message#.read().decode('utf-8')
+
+    #return str(decoded_message).replace('\\r','').replace('\\t','').replace('\\n','')
 
 
 def write_file_utility(file_name,file_content):
@@ -91,12 +84,12 @@ def write_file_utility(file_name,file_content):
 def get_most_recent_aws_sns_email():
     try:
         service = getCreds()
-        print('1')
         messages = get_inbox(service)
-        print('2')
         return message_parser(messages, NUM_OF_MESSAGES, service)
     except:
-        return 'Error - Sorry :('
+        e = sys.exc_info()[0]
+        print(str(e))
+        return str(e)
 
 
 def getCreds():
@@ -121,3 +114,37 @@ def getCreds():
 
 if __name__ == '__main__':
     main()
+
+
+        # decoded_html = decode_string(curr_message_info['payload']['body']['data'])
+        #return decoded_html.replace('b\'','') + '}'
+            #file_name = '../output/html_index_' + str(i) + '.html'
+
+    # return headers_dict
+
+
+        #if headers[j]['name'] == 'From' and '<no-reply@sns.amazonaws.com>' in headers[j]['value']:
+            #json_body = decode_string(curr_message_info['payload']['body']['data'])
+            #print(json_body['notificationType'])
+            #return headers_dict
+            #return json_body
+
+        #     file_name = ''
+        #     if headers[j]['name'] == 'Content-Type':
+        #         print(headers[j]['value'])
+        #         if 'multipart/alternative' in headers[j]['value']:
+        #             multipart_text = multipart_alt_parser(curr_message_info['payload']['parts'][0])
+        #             file_name = '../output/multipart_text_index_' + str(i) + '.txt'
+        #             return multipart_text
+        #             #write_file_utility(file_name, multipart_text)
+        #
+                # el
+        #  write_file_utility(file_name, decoded_html)
+        #
+        #         elif 'text/plain' in headers[j]['value']:
+        #             return curr_message_info
+        #         else:
+        #             return 'Error: Please try again.'
+        #         continue
+        #
+        #print('-------------' + str(i) + '----------------')
