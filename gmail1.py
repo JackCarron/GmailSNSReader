@@ -39,14 +39,16 @@ def main():
     results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
     messages = results.get('messages', [])
 
-    most_recent_message_info = service.users().messages() \
-    .get(userId='me',id=messages[2]['id']).execute()
-    message_info = most_recent_message_info['payload']['parts'][0]
-    message = message_info['body']['data']
-    decoded_message = base64.urlsafe_b64decode(message)
-    decoded_message_list = str(decoded_message).split('\\r\\n')
-    for m in decoded_message_list:
-        print(m)
+    for i in range(20):
+        most_recent_message_info = service.users().messages() \
+        .get(userId='me',id=messages[i]['id']).execute()
+        message_info = most_recent_message_info['payload']['parts'][0]
+        message = message_info['body']['data']
+        decoded_message = base64.urlsafe_b64decode(message)
+        decoded_message_list = str(decoded_message).split('\\r\\n')
+        for m in decoded_message_list:
+            print(m)
+        print('-----')
         
         
 
