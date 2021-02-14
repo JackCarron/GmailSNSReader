@@ -9,8 +9,51 @@ import base64
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+NUM_OF_MESSAGES = 20
+
 
 def main():
+
+    service = getCreds()
+    print('service: ' + str(service))
+
+    # Call the Gmail API
+    results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
+    messages = results.get('messages', [])
+    message_parser(messages, NUM_OF_MESSAGES, service)
+
+
+def message_parser(messages, num_of_messages, service):
+    for i in range(num_of_messages):
+        is_text_flag = False
+        # curr_message_info is main object
+        curr_message_info = service.users().messages() \
+        .get(userId='me',id=messages[i]['id']).execute()
+        headers = curr_message_info['payload']['headers']
+        for j in range(len(headers)):
+            print('index #: ' + str(j))
+            if headers[j]['name'] != None and headers[j]['name'] == 'Content-Type':
+                print(json.dumps(headers[j],indent=2))
+                if 'multipart/alternative' in headers[j]['value']:
+                    is_text_flag = True
+        if is_text_flag:
+            multipart_alt_parser(curr_message_info)
+        print('-------------------------------')
+        print('-------------' + str(i) + '----------------')
+        print('-------------------------------')
+        
+
+def multipart_alt_parser(message):
+        message_info = message['payload']['parts'][0]
+        message = message_info['body']['data']
+        decoded_message = base64.urlsafe_b64decode(message)
+        decoded_message_list = str(decoded_message).split('\\r\\n')
+        for m in decoded_message_list:
+            print(m)
+
+
+
+def getCreds():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
     """
@@ -32,25 +75,8 @@ def main():
         # Save the credentials for the next run
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
-
-    service = build('gmail', 'v1', credentials=creds)
-
-    # Call the Gmail API
-    results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
-    messages = results.get('messages', [])
-
-    for i in range(20):
-        most_recent_message_info = service.users().messages() \
-        .get(userId='me',id=messages[i]['id']).execute()
-        message_info = most_recent_message_info['payload']['parts'][0]
-        message = message_info['body']['data']
-        decoded_message = base64.urlsafe_b64decode(message)
-        decoded_message_list = str(decoded_message).split('\\r\\n')
-        for m in decoded_message_list:
-            print(m)
-        print('-----')
-        
-        
+    return build('gmail', 'v1', credentials=creds)
+    
 
 if __name__ == '__main__':
     main()
