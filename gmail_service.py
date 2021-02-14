@@ -15,11 +15,7 @@ NUM_OF_MESSAGES = 25
 
 
 def main():
-
     service = getCreds()
-    print('service: ' + str(service))
-
-    # Call the Gmail API
     results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
     messages = results.get('messages', [])
     message_parser(messages, NUM_OF_MESSAGES, service)
@@ -32,17 +28,18 @@ def message_parser(messages, num_of_messages, service):
         headers = curr_message_info['payload']['headers']
         for j in range(len(headers)):
             file_name = ''
+            
             if headers[j]['name'] != None and headers[j]['name'] == 'Content-Type':
                 if 'multipart/alternative' in headers[j]['value']:
                     multipart_text = multipart_alt_parser(curr_message_info['payload']['parts'][0])
                     file_name = 'output/multipart_text_index_' + str(i) + '.txt'
                     write_file_utility(file_name, multipart_text)
-                
+                    
                 elif 'text/html' in headers[j]['value']:
                     decoded_html = decode_string(curr_message_info['payload']['body']['data'])
                     file_name = 'output/html_index_' + str(i) + '.html'
                     write_file_utility(file_name, decoded_html)
-
+                    
                 webbrowser.open(BASE_URL + file_name,new=2)
                 continue
         print('-------------' + str(i) + '----------------')
@@ -72,8 +69,6 @@ def getCreds():
     """
     creds = None
     # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
