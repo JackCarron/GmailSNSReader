@@ -32,10 +32,9 @@ def get_inbox(service):
     return results.get('messages', [])
 
 
-def message_parser(messages, num_of_messages, service):
+def message_parser(messages, num_of_messages, service, search_string):
     try:
         list_of_emails = []
-        print(len(messages))
         for i in range(num_of_messages):
             curr_message_info = service.users().messages() \
                 .get(userId='me',id=messages[i]['id']).execute()
@@ -43,14 +42,10 @@ def message_parser(messages, num_of_messages, service):
             headers_dict = {}
             for j in range(len(headers)):
                 headers_dict[headers[j]['name']]= headers[j]['value']
-
-            if '<no-reply@sns.amazonaws.com>' in headers_dict['From']:
+            if search_string in headers_dict['From']:
                 decoded_bytes = decode_string(curr_message_info['payload']['body']['data'])
                 utf8_str = str(decoded_bytes, 'UTF-8')
-                #if  json.loads(utf8_str)['Type'] != None # and \
-                #json.loads(utf8_str)['Type'] == 'Notification':
                 list_of_emails.append(utf8_str)
-                print('HERE!123456')
         return list_of_emails
     except:
         e = sys.exc_info()
@@ -79,11 +74,11 @@ def write_file_utility(file_name,file_content):
 
 
 # For getting aws mails
-def get_most_recent_aws_sns_email():
+def get_most_recent_aws_sns_email(num_of_messages = NUM_OF_MESSAGES, search_string = '@'):
     try:
         service = getCreds()
         messages = get_inbox(service)
-        return message_parser(messages, NUM_OF_MESSAGES, service)
+        return message_parser(messages, num_of_messages, service, search_string)
     except:
         e = sys.exc_info()[0]
         return str(e)
@@ -111,37 +106,3 @@ def getCreds():
 
 if __name__ == '__main__':
     main()
-
-
-        # decoded_html = decode_string(curr_message_info['payload']['body']['data'])
-        #return decoded_html.replace('b\'','') + '}'
-            #file_name = '../output/html_index_' + str(i) + '.html'
-
-    # return headers_dict
-
-
-        #if headers[j]['name'] == 'From' and '<no-reply@sns.amazonaws.com>' in headers[j]['value']:
-            #json_body = decode_string(curr_message_info['payload']['body']['data'])
-            #print(json_body['notificationType'])
-            #return headers_dict
-            #return json_body
-
-        #     file_name = ''
-        #     if headers[j]['name'] == 'Content-Type':
-        #         print(headers[j]['value'])
-        #         if 'multipart/alternative' in headers[j]['value']:
-        #             multipart_text = multipart_alt_parser(curr_message_info['payload']['parts'][0])
-        #             file_name = '../output/multipart_text_index_' + str(i) + '.txt'
-        #             return multipart_text
-        #             #write_file_utility(file_name, multipart_text)
-        #
-                # el
-        #  write_file_utility(file_name, decoded_html)
-        #
-        #         elif 'text/plain' in headers[j]['value']:
-        #             return curr_message_info
-        #         else:
-        #             return 'Error: Please try again.'
-        #         continue
-        #
-        #print('-------------' + str(i) + '----------------')
