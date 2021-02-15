@@ -34,28 +34,26 @@ def get_inbox(service):
 
 def message_parser(messages, num_of_messages, service):
     try:
-        print('HERE123')
         list_of_emails = []
+        print(len(messages))
         for i in range(num_of_messages):
             curr_message_info = service.users().messages() \
                 .get(userId='me',id=messages[i]['id']).execute()
             headers = curr_message_info['payload']['headers']
             headers_dict = {}
-            index = 0
             for j in range(len(headers)):
                 headers_dict[headers[j]['name']]= headers[j]['value']
 
             if '<no-reply@sns.amazonaws.com>' in headers_dict['From']:
-                print('HERE456')
                 decoded_bytes = decode_string(curr_message_info['payload']['body']['data'])
-                print('HERE789')
                 utf8_str = str(decoded_bytes, 'UTF-8')
+                #if  json.loads(utf8_str)['Type'] != None # and \
+                #json.loads(utf8_str)['Type'] == 'Notification':
                 list_of_emails.append(utf8_str)
-                index += 1
+                print('HERE!123456')
         return list_of_emails
     except:
         e = sys.exc_info()
-        print(str(e))
         return str(e)
 
 
@@ -88,7 +86,6 @@ def get_most_recent_aws_sns_email():
         return message_parser(messages, NUM_OF_MESSAGES, service)
     except:
         e = sys.exc_info()[0]
-        print(str(e))
         return str(e)
 
 
