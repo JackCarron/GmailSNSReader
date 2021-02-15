@@ -7,6 +7,12 @@ from google.auth.transport.requests import Request
 import json
 import base64
 import webbrowser
+import sys
+from flask import jsonify
+import re
+from urllib.parse import unquote
+import codecs
+
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -21,29 +27,31 @@ def main():
     message_parser(messages, NUM_OF_MESSAGES, service)
 
 
-def message_parser(messages, num_of_messages, service):
-    for i in range(num_of_messages):
-        curr_message_info = service.users().messages() \
-            .get(userId='me',id=messages[i]['id']).execute()
-        headers = curr_message_info['payload']['headers']
-        for j in range(len(headers)):
-            file_name = ''
-            
-            if headers[j]['name'] != None and headers[j]['name'] == 'Content-Type':
-                if 'multipart/alternative' in headers[j]['value']:
-                    multipart_text = multipart_alt_parser(curr_message_info['payload']['parts'][0])
-                    file_name = 'output/multipart_text_index_' + str(i) + '.txt'
-                    write_file_utility(file_name, multipart_text)
-                    
-                elif 'text/html' in headers[j]['value']:
-                    decoded_html = decode_string(curr_message_info['payload']['body']['data'])
-                    file_name = 'output/html_index_' + str(i) + '.html'
-                    write_file_utility(file_name, decoded_html)
-                    
-                webbrowser.open(BASE_URL + file_name,new=2)
-                continue
-        print('-------------' + str(i) + '----------------')
-        
+def get_inbox(service):
+    results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
+    return results.get('messages', [])
+
+
+def message_parser(messages, num_of_messages, service, search_string):
+    try:
+        list_of_emails = []
+        for i in range(num_of_messages):
+            curr_message_info = service.users().messages() \
+                .get(userId='me',id=messages[i]['id']).execute()
+            headers = curr_message_info['payload']['headers']
+            headers_dict = {}
+            for j in range(len(headers)):
+                headers_dict[headers[j]['name']]= headers[j]['value']
+            if search_string in headers_dict['From']:
+                decoded_bytes = decode_string(curr_message_info['payload']['body']['data'])
+                utf8_str = str(decoded_bytes, 'UTF-8')
+                list_of_emails.append(utf8_str)
+        return list_of_emails
+    except:
+        e = sys.exc_info()
+        return str(e)
+
+
 
 def multipart_alt_parser(message):
         message_info = message
@@ -53,20 +61,30 @@ def multipart_alt_parser(message):
 
 
 def decode_string(message):
-    decoded_message = base64.urlsafe_b64decode(message)
-    return str(decoded_message).replace('\\r','').replace('\\t','').replace('\\n','')
-    
+    decoded_message = base64.urlsafe_b64decode(message + '==')
+    return decoded_message#.read().decode('utf-8')
+
+    #return str(decoded_message).replace('\\r','').replace('\\t','').replace('\\n','')
+
 
 def write_file_utility(file_name,file_content):
-    file= open(file_name,'w')
+    file = open(file_name,'w')
     file.write(file_content)
     file.close()
 
 
+# For getting aws mails
+def get_most_recent_aws_sns_email(num_of_messages = NUM_OF_MESSAGES, search_string = '@'):
+    try:
+        service = getCreds()
+        messages = get_inbox(service)
+        return message_parser(messages, num_of_messages, service, search_string)
+    except:
+        e = sys.exc_info()[0]
+        return str(e)
+
+
 def getCreds():
-    """Shows basic usage of the Gmail API.
-    Lists the user's Gmail labels.
-    """
     creds = None
     # The file token.pickle stores the user's access and refresh tokens, and is
     if os.path.exists('token.pickle'):
@@ -84,7 +102,7 @@ def getCreds():
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
     return build('gmail', 'v1', credentials=creds)
-    
+
 
 if __name__ == '__main__':
     main()
