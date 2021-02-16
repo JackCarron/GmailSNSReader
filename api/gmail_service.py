@@ -104,5 +104,26 @@ def getCreds():
     return build('gmail', 'v1', credentials=creds)
 
 
+# ============================
+# V2/EMAILS/SEARCH API SERVICE
+# ============================
+def get_messages_with_search(search_string,max_results,page_token):
+    search_string = 'from:<' + search_string + '>'
+    service = getCreds()
+    results = service.users().messages().list(userId='me',q=search_string,maxResults=15,pageToken=page_token).execute()
+    list_of_emails = get_messages_from_gmail_list(results, service)
+    return {'emails': list_of_emails, 'pageToken': results['nextPageToken']}
+
+
+def get_messages_from_gmail_list(results, service):
+    list_of_emails = []
+    print(len(results))
+    for i in range(len(results)):
+        curr_message_info = service.users().messages() \
+            .get(userId='me',id=results['messages'][i]['id']).execute()
+        list_of_emails.append(curr_message_info)
+    return list_of_emails
+
+
 if __name__ == '__main__':
     main()

@@ -1,6 +1,10 @@
 import React from 'react';
 import utf8 from 'utf8';
 import quotedPrintable from 'quoted-printable';
+import {
+  encode, decode, trim,
+  isBase64, isUrlSafeBase64
+} from 'url-safe-base64'
 
 class EmailView extends React.Component {
 
@@ -8,19 +12,21 @@ class EmailView extends React.Component {
     super(props);
     this.state = {listOfHtml : [],
     html : '',
+    emailList: [],
     curr_index : 0};
-    this.fetchData = this.fetchData.bind(this);
+    //this.fetchData = this.fetchData.bind(this);
     this.moveNext = this.moveNext.bind(this);
+    this.fetchDataV2 = this.fetchDataV2.bind(this)
   }
 
   componentDidMount(){
-   this.fetchData()
+   this.fetchDataV2()
  }
 
  fetchData() {
    let str = '';
    let newList = [];
-   fetch("http://localhost:4444/api/emails/search?fromAddress=<no-reply@sns.amazonaws.com>&numOfEmails=5")
+   fetch("http://localhost:4444/api/v1/emails/search?fromAddress=<no-reply@sns.amazonaws.com>&numOfEmails=50")
    .then((resp) => {
     return resp.json();
     })
@@ -39,6 +45,9 @@ class EmailView extends React.Component {
             } else {
               str = str;
             }
+            if (str.includes('Content-Transfer-Encoding: base64')){
+              str = str.split('Content-Transfer-Encoding: base64')[1];
+            }
             console.log(str);
         }
         else {
@@ -54,7 +63,32 @@ class EmailView extends React.Component {
   //    this.setState({listOfHtml : ['1']});
   //    console.log('HERE123');
   // }
- }
+}
+
+ fetchDataV2() {
+   let str = '';
+   let newList = [];
+   fetch("http://localhost:4444/api/v2/emails/search?fromAddress=no-reply@sns.amazonaws.com&numOfEmails=15")
+   .then((resp) => {
+    return resp.json();
+    })
+    .then((data) => {
+      data = data.emails;
+      let currEmailList = [];
+      for (let i in data) {
+        let awsData = trim(data[i]['payload']['body']['data'] + '==');
+        let urlSafeBase64AwsData = decode(awsData);
+        let base64decodedAwsData = atob(urlSafeBase64AwsData);
+        if (encodeURI(base64decodedAwsData).substring(0,30) === '%7B%0D%0A%20%20%22Type%22%20:%') {
+          let utf8decodedAwsData = decode(base64decodedAwsData);
+          currEmailList.push(JSON.parse(JSON.parse(utf8decodedAwsData)['Message']));
+        }
+      }
+      this.setState({html: currEmailList});
+      console.log(currEmailList);
+    });
+  }
+
 
   moveNext() {
     console.log('here');
