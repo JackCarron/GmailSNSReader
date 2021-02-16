@@ -6,9 +6,12 @@ from flask import jsonify
 from flask import request
 import re
 import quopri
+from flask_cors import CORS
+
 
 
 app = flask.Flask(__name__)
+CORS(app)
 app.config["DEBUG"] = True
 
 @app.route('/api/emails/search', methods=['GET'])
