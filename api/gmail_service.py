@@ -112,7 +112,12 @@ def get_messages_with_search(search_string,max_results,page_token):
     service = getCreds()
     results = service.users().messages().list(userId='me',q=search_string,maxResults=15,pageToken=page_token).execute()
     list_of_emails = get_messages_from_gmail_list(results, service)
-    return {'emails': list_of_emails, 'pageToken': results['nextPageToken']}
+    pageToken = 'NULL'
+    try:
+        pageToken = results['nextPageToken']
+    except:
+        pass
+    return {'emails': list_of_emails, 'pageToken': pageToken}
 
 
 def get_messages_from_gmail_list(results, service):
