@@ -5,6 +5,9 @@ import {
   encode, decode, trim,
   isBase64, isUrlSafeBase64
 } from 'url-safe-base64'
+import xss from 'xss'
+
+const DEFAULT_PAGE_SIZE = 10;
 
 class EmailView extends React.Component {
 
@@ -15,107 +18,135 @@ class EmailView extends React.Component {
     emailList: [],
     commonHeadersList: [],
     curr_index : 0,
-    nextPageToken : ''}
+    nextPageToken : '',
+    pageSize : DEFAULT_PAGE_SIZE}
     this.moveNext = this.moveNext.bind(this);
     this.fetchDataV2 = this.fetchDataV2.bind(this)
     this.selectEmail = this.selectEmail.bind(this);
+    this.loadMore = this.loadMore.bind(this);
   }
 
   componentDidMount(){
    this.fetchDataV2();
-   let referenceToThis = this;
-   let interval = setInterval(function(){
-     // method to be executed;
-      if (referenceToThis.state.nextPageToken !== 'NULL') {
-        referenceToThis.moveNext();
-      }
-    }, 3000);
+   this.startFetching10More(this);
   }
 
- fetchData() {
-   let str = '';
-   let newList = [];
-   fetch("http://localhost:4444/api/v1/emails/search?fromAddress=<no-reply@sns.amazonaws.com>&numOfEmails=50")
-   .then((resp) => {
-    return resp.json();
-    })
-    .then((data) => {
-      for (let email in data) {
-        console.log(email);
-        console.log(data[email]);
-        if (data[email].quotable_printable !== undefined) {
-            str = quotedPrintable.decode(data[email].quotable_printable);
-            str = utf8.decode(str);
-            str = str.split('</html>')[0];
-            if (str.includes('<html lang="en">')) {
-                str = str.split('<html lang="en">')[1];
-            } else if (str.includes('<html>')) {
-              str = str.split('<html>')[1];
-            } else {
-              str = str;
-            }
-            if (str.includes('Content-Transfer-Encoding: base64')){
-              str = str.split('Content-Transfer-Encoding: base64')[1];
-            }
-            console.log(str);
-        }
-        else {
-          str = data[email].text_plain;
-        }
-        newList.push(str);
-    }
-    this.setState({ listOfHtml: newList , html: newList[this.state.curr_index]});
-    console.log(newList);
-  });
-}
+  startFetching10More(referenceToThis) {
+    let interval = setInterval(function(){
+      // method to be executed;
+       console.log(referenceToThis.state.nextPageToken);
+       if (referenceToThis.state.nextPageToken !== 'NULL' &&
+           referenceToThis.state.emailList !== undefined &&
+           referenceToThis.state.pageSize !== undefined &&
+           referenceToThis.state.emailList.length < referenceToThis.state.pageSize) {
+         referenceToThis.moveNext();
+       } else {
+         clearInterval(interval);
+       }
+     }, 5000);
+  }
 
  fetchDataV2() {
    let str = '';
    let newList = [];
-   fetch("http://localhost:4444/api/v2/emails/search?fromAddress=no-reply@sns.amazonaws.com&numOfEmails=15")
+   fetch("http://localhost:4444/api/v2/emails/search?fromAddress=no-reply@sns.amazonaws.com&numOfEmails=5&labelIds=Label_5098114589143438238")
    .then((resp) => {
     return resp.json();
     })
     .then((data) => {
       this.setStateVariables(data);
     }).catch(error => {
+      console.log('HERE!!');
+      console.log(error);
       this.setState({'nextPageToken' : 'NULL'});
     });
   }
 
 
   setStateVariables(data) {
-    let currNextPageToken = data.pageToken;
+    let currNextPageToken = 'NULL';
+    if (data.pageToken !== 'NULL') {
+         currNextPageToken = data.pageToken;
+    }
+    console.log('---------------------------------------------');
+    console.log('IN SET STATE VARIABLES: ' + currNextPageToken);
+    //console.log(data.pageToken)
     data = data.emails;
     let currEmailList = this.state.emailList;
     let currCommonHeadersList = this.state.commonHeadersList;
-    for (let i in data) {
-      let awsData = trim(data[i]['payload']['body']['data'] + '==');
-      let urlSafeBase64AwsData = decode(awsData);
-      let base64decodedAwsData = atob(urlSafeBase64AwsData);
-      if (encodeURI(base64decodedAwsData).substring(0,30) === '%7B%0D%0A%20%20%22Type%22%20:%') {
-        let utf8decodedAwsData = decode(base64decodedAwsData);
-        if (!JSON.parse(utf8decodedAwsData)['Message'].startsWith('{')) continue;
-        let jsonParsedEmail = JSON.parse(JSON.parse(utf8decodedAwsData)['Message']);
-        currEmailList.push(jsonParsedEmail);
-        jsonParsedEmail['mail']['commonHeaders']['messageId'] = jsonParsedEmail['mail']['commonHeaders']['messageId']+ (this.state.commonHeadersList.length + i + 1);
-        currCommonHeadersList.push(jsonParsedEmail['mail']['commonHeaders']);
+    try{
+      for (let i in data) {
+        let awsData = trim(data[i]['payload']['body']['data'] + '==');
+        let urlSafeBase64AwsData = decode(awsData);
+        let base64decodedAwsData = atob(urlSafeBase64AwsData);
+        let utf8decodedAwsData;
+        try {;
+          utf8decodedAwsData = JSON.parse(base64decodedAwsData);
+        } catch(error1) {
+            console.log('error1');
+            let otherNotificationType = decode(base64decodedAwsData).split('%2D%2D')[0].split('If you wish to stop receiving notifications from this topic, please click or visit the link below to unsubscribe:')[0];
+          console.log(otherNotificationType.substring(0, otherNotificationType.length - 5));
+            try {
+              utf8decodedAwsData = JSON.parse(otherNotificationType.substring(0, otherNotificationType.length - 5));
+            } catch (error2) {
+              console.log('error2');
+              console.log(error2);
+            }
         }
+            let jsonParsedEmail;
+            try {
+              jsonParsedEmail = JSON.parse(utf8decodedAwsData['Message']);
+            } catch (error3) {
+              console.log('error3');
+              try {
+              jsonParsedEmail = JSON.parse(utf8decodedAwsData['content']);
+            } catch (error4) {
+              console.log('error4');
+              jsonParsedEmail = utf8decodedAwsData;
+              }
+            }
+            try {
+              jsonParsedEmail['mail']['commonHeaders']['messageId'] = jsonParsedEmail['mail']['commonHeaders']['messageId']+ (this.state.commonHeadersList.length + i + 1);
+              currCommonHeadersList.push(jsonParsedEmail['mail']['commonHeaders']);
+              currEmailList.push(jsonParsedEmail);
+              }
+            catch(error) {
+              try {
+                console.log('error5');
+                jsonParsedEmail['mail']['messageId'] = jsonParsedEmail['mail']['messageId'] +
+                  (this.state.commonHeadersList.length + i + 1);
+                currCommonHeadersList.push({
+                  'from': jsonParsedEmail['mail']['destination'],
+                  'messageId' : jsonParsedEmail['mail']['messageId']
+                });
+                currEmailList.push(jsonParsedEmail);
+              }
+              catch (error) {
+                console.log('error6');
+                console.log(jsonParsedEmail);
+                console.log('PASS NOW');
+              }
+              // This could be "Type" : "Notification"
+
+              // console.log('PASS THAT EMAIL');
+            }
+          }
+        }
+      catch(error) {
+        console.log('IN THE BAD ZONE!')
+        console.log(error);
       }
-      this.setState({
-        emailList: currEmailList,
-        commonHeadersList : currCommonHeadersList,
-        nextPageToken : currNextPageToken});
-      console.log(currEmailList);
-      console.log(this.state.commonHeadersList);
+    this.setState({
+      emailList: currEmailList,
+      commonHeadersList : currCommonHeadersList,
+      nextPageToken : currNextPageToken});
   }
 
   moveNext() {
     let str = '';
     let newList = [];
     let isEnd = false;
-    fetch("http://localhost:4444/api/v2/emails/search?fromAddress=no-reply@\
-      sns.amazonaws.com&numOfEmails=15&pageToken="+this.state.nextPageToken)
+    fetch("http://localhost:4444/api/v2/emails/search?fromAddress=no-reply@sns.amazonaws.com&numOfEmails=15&pageToken="+this.state.nextPageToken+"&labelIds=Label_5098114589143438238")
     .then((resp) => {
      return resp.json();
      })
@@ -127,35 +158,60 @@ class EmailView extends React.Component {
     }
 
   selectEmail(event) {
-      let currEmailList = this.state.emailList[parseInt(event.target.name)];
-      this.setState({html : JSON.stringify(currEmailList)});
-      console.log(this.state.html);
+    console.log(this.state.emailList);
+      let currEmailJSON = this.state.emailList[parseInt(event.target.name)];
+      let currContent = currEmailJSON['content'];
+      console.log(currContent);
+      let emailList = [];
+      let regex = /Content[-+]Type:/g;
+      if (regex.test(currContent)) {
+        emailList = currContent.split(regex);
+        if (emailList > 1) {
+          emailList.splice(0,1);
+        }
+      }
+      try {
+        currContent = emailList[emailList.length-1];
+        currContent = quotedPrintable.decode(currContent);
+        // console.log(currContent);
+      } catch(error) {
+        console.log(error);
+      }
+      console.log('SIZE OF LIST: ' + emailList.length);
+      this.setState({html : currContent});
     }
 
-//<div dangerouslySetInnerHTML={{__html:this.state.html}}></div>
-// {this.state.commonHeadersList.length > 0 && this.state.commonHeadersList.map((value, index) => {
-// return <li key={index}>{value}</li>
-// })}
+  loadMore() {
+    this.state.pageSize += 10;
+    this.startFetching10More(this);
+  }
 
   render() {
-    const insertableHTML = decode(this.state.html)
-    const commonHeadersList = this.state.commonHeadersList.map((header, index) =>
-      <div>
-        <button className="listItem"
+    const insertableHTML = this.state.html
+    const commonHeadersList = this.state.commonHeadersList.map((header, index) => {
+      return  <div>
+        <button style={{width:'500px'}}
+                className="listItem"
                 name={index}
                 key={header.messageId}
-                onClick={this.selectEmail}>{decode(header.from[0].replace(/[<>]/g,''))}
+                onClick={this.selectEmail}>
+            {decode(header.from[0].replace(/[<>]/g,'')).replace('=', '.')}<br />
+            {header.subject}
         </button>
       </div>
+      }
     );
     return (
       <div>
-        <button onClick={this.moveNext}>Next</button>
         {commonHeadersList}
-        <div dangerouslySetInnerHTML={{__html:insertableHTML}}></div>
-        <div>
-        {this.state.nextPageToken !== 'NULL' ? 'Loading More...' : ''}
+        <div style={{margin:'1vw'}}>
+        {this.state.nextPageToken !== 'NULL' &&
+         this.state.emailList.length < this.state.pageSize ?
+            'Loading More...' :
+            <button onClick={this.loadMore}>Load More</button>}
         </div>
+        <div dangerouslySetInnerHTML={{__html:insertableHTML}}></div>
+
       </div>
     );
   }
