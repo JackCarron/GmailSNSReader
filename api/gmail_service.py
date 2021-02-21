@@ -20,11 +20,11 @@ BASE_URL = 'file:///Library/Frameworks/Python.framework/Versions/3.8/bin/scripts
 NUM_OF_MESSAGES = 25
 
 
-def main():
-    service = getCreds()
-    results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
-    messages = results.get('messages', [])
-    message_parser(messages, NUM_OF_MESSAGES, service)
+# def main():
+#     service = getCreds()
+#     results = service.users().messages().list(userId='me',labelIds="INBOX").execute()
+#     messages = results.get('messages', [])
+#     message_parser(messages, NUM_OF_MESSAGES, service)
 
 
 def get_inbox(service):
@@ -104,5 +104,34 @@ def getCreds():
     return build('gmail', 'v1', credentials=creds)
 
 
-if __name__ == '__main__':
-    main()
+# ============================
+# V2/EMAILS/SEARCH API SERVICE
+# ============================
+def get_messages_with_search(search_string,max_results,page_token,label_ids):
+    search_string = 'from:<' + search_string + '>'
+    print('q=' + str(search_string) + '&maxResult=' + str(max_results))
+    print('&pageToken=' + str(page_token) + '&labelIds=' + label_ids)
+    service = getCreds()
+    results = service.users().messages().list(userId='me',maxResults=5,pageToken=page_token,labelIds=label_ids).execute()
+    print('results:')
+    print(results)
+    list_of_emails = get_messages_from_gmail_list(results, service)
+    pageToken = 'NULL'
+    try:
+        pageToken = results['nextPageToken']
+    except:
+        pass
+    return {'emails': list_of_emails, 'pageToken': pageToken}
+
+
+def get_messages_from_gmail_list(results, service):
+    list_of_emails = []
+    for i in range(len(results)):
+        curr_message_info = service.users().messages() \
+            .get(userId='me',id=results['messages'][i]['id']).execute()
+        list_of_emails.append(curr_message_info)
+    return list_of_emails
+
+
+# if __name__ == '__main__':
+#     main()

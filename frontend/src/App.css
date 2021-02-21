@@ -36,3 +36,8 @@
     transform: rotate(360deg);
   }
 }
+
+.listItem {
+  border-color:black;
+  border-style: dotted dashed solid double;
+}
