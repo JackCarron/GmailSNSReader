@@ -80,7 +80,7 @@ class EmailView extends React.Component {
         let urlSafeBase64AwsData = decode(awsData);
         let base64decodedAwsData = atob(urlSafeBase64AwsData);
         let utf8decodedAwsData;
-        try {;
+        try {
           utf8decodedAwsData = JSON.parse(base64decodedAwsData);
         } catch(error1) {
             console.log('error1');
@@ -195,7 +195,7 @@ class EmailView extends React.Component {
                 name={index}
                 key={header.messageId}
                 onClick={this.selectEmail}>
-            {decode(header.from[0].replace(/[<>]/g,'')).replace('=', '.')}<br />
+            {decode(header.from[0].replace(/[<>]/g,'')).replaceAll('=', '.')}<br />
             {header.subject}
         </button>
       </div>
